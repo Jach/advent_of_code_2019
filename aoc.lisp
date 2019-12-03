@@ -120,8 +120,9 @@ U62,R66,U55,R34,D71,R55,D58,R83")
                         (push (cons step-x step-y) points)))))
     points))
 
-(defun closest-distance (points)
-  (loop for point in points minimizing (+ (abs (car point)) (abs (cdr point)))))
+(defun closest-distance (points) ; from origin
+  (loop for point in points minimizing (+ (abs (car point))
+                                          (abs (cdr point)))))
 
 (defun sol3 (puz)
   (let* ((moves (puzzle-to-movements puz))
@@ -160,8 +161,10 @@ U62,R66,U55,R34,D71,R55,D58,R83")
 
 (defun edge-intersect (edge1 edge2)
   ; make it so we can assume edge1 has same x for start/end, edge2 has same-y for start/end.
-  (if (= (edge-start-x edge2)
-         (edge-end-x edge2))
+  (if (and (= (edge-start-x edge2)
+              (edge-end-x edge2))
+           (= (edge-start-y edge1)
+              (edge-end-y edge1)))
       (rotatef edge1 edge2))
   (if (and (<= (min (edge-start-x edge2) (edge-end-x edge2))
                (edge-start-x edge1)
@@ -187,3 +190,38 @@ U62,R66,U55,R34,D71,R55,D58,R83")
                 collecting intersect))))
 
 (closest-distance (intersects (uiop:read-file-string #p"day3input")))
+
+; part 2
+
+(defun point-edge (x y)
+  (edge x y x y))
+
+(defun point-man-dist (point1 point2)
+  (+ (abs (- (car point1) (car point2)))
+     (abs (- (cdr point1) (cdr point2)))))
+
+(defun edge-dist (edge) ; dist from start to end
+  (point-man-dist (cons (edge-start-x edge)
+                        (edge-start-y edge))
+                  (cons (edge-end-x edge)
+                        (edge-end-y edge))))
+
+
+(defun steps-to-intersect (wire-moves intersect)
+  (let ((ordered-wire-edges (reverse (moves-to-segments wire-moves)))
+        (intersect-edge (point-edge (car intersect) (cdr intersect)))
+        (steps 0))
+    (dolist (edge ordered-wire-edges)
+      (alexandria:if-let ((point (edge-intersect edge intersect-edge)))
+        (return (incf steps (point-man-dist (cons (edge-start-x edge) (edge-start-y edge))
+                                            point)))
+        (incf steps (edge-dist edge))))
+    steps))
+
+(let* ((puz (uiop:read-file-string #p"day3input"))
+       (movements (puzzle-to-movements puz))
+       (intersects (intersects puz)))
+  (loop for intersect in intersects minimizing
+        (+ (steps-to-intersect (first movements) intersect)
+           (steps-to-intersect (second movements) intersect))))
+
