@@ -66,3 +66,124 @@
               (when (= (aref (execute-program ap) 0) 19690720)
                 (print #I(100 * noun + verb))
                 (return)))))
+
+;; day 3
+
+(defparameter *ex1* "R8,U5,L5,D3
+U7,R6,D4,L4")
+(defparameter *ex2* "R75,D30,R83,U83,L12,D49,R71,U7,L72
+U62,R66,U55,R34,D71,R55,D58,R83")
+
+(defun puzzle-to-movements (puzzle)
+  (mapcar (lambda (line)
+            (let ((moves (uiop:split-string line :separator ",")))
+              (mapcar (lambda (move)
+                        (cons (elt move 0)
+                              (parse-integer (subseq move 1))))
+                      moves)))
+          (uiop:split-string puzzle :separator (string #\newline))))
+
+;(puzzle-to-movements *ex1*)
+; idea: starting at 'origin' (0,0) apply movements and mark hashmap entry as occupied for each step
+; then compare the keys of each wire path and find matches
+; then distance, min
+
+; no need for hash, just dump moves into a list
+
+(defun move-x (x move)
+  (case (car move)
+    (#\R (+ x (cdr move)))
+    (#\L (- x (cdr move)))
+    (t x)))
+
+(defun move-y (y move)
+  (case (car move)
+    (#\U (+ y (cdr move)))
+    (#\D (- y (cdr move)))
+    (t y)))
+
+(defun moves-to-occupied-points (moves)
+  (let ((points '())
+        (x 0)
+        (y 0))
+    (loop for move in moves do
+          (let ((start-x x)
+                (start-y y)
+                (new-x (move-x x move))
+                (new-y (move-y y move)))
+            (setf x new-x
+                  y new-y)
+            (if (< new-x start-x) (rotatef new-x start-x))
+            (if (< new-y start-y) (rotatef new-y start-y))
+            (loop for step-x from start-x to new-x do
+                  (loop for step-y from start-y to new-y do
+                        (push (cons step-x step-y) points)))))
+    points))
+
+(defun closest-distance (points)
+  (loop for point in points minimizing (+ (abs (car point)) (abs (cdr point)))))
+
+(defun sol3 (puz)
+  (let* ((moves (puzzle-to-movements puz))
+         (line1 (first moves))
+         (line2 (second moves))
+         (points1 (moves-to-occupied-points line1))
+         (points2 (moves-to-occupied-points line2)))
+    (closest-distance (remove-if (lambda (cell) (equal cell '(0 . 0)))
+                                 (intersection points1 points2 :test 'equal)))))
+;(sol3 *ex2*)
+; so now looking at the actual input, lol, this isn't going to work for such big planes!
+; instead lets push moves to a list of line segments, then intersect the line segments.
+
+(defstruct edge
+  start-x
+  start-y
+  end-x
+  end-y)
+(defun edge (start-x start-y end-x end-y)
+  (make-edge :start-x start-x :start-y start-y
+             :end-x end-x :end-y end-y))
+
+(defun moves-to-segments (moves)
+  (let ((segments '())
+        (x 0)
+        (y 0))
+    (loop for move in moves do
+          (let ((new-x (move-x x move))
+                (new-y (move-y y move)))
+            (push (edge x y new-x new-y) segments)
+            (setf x new-x
+                  y new-y)))
+    segments))
+
+(moves-to-segments (first (puzzle-to-movements *ex1*)))
+
+(defun edge-intersect (edge1 edge2)
+  ; make it so we can assume edge1 has same x for start/end, edge2 has same-y for start/end.
+  (if (= (edge-start-x edge2)
+         (edge-end-x edge2))
+      (rotatef edge1 edge2))
+  (if (and (<= (min (edge-start-x edge2) (edge-end-x edge2))
+               (edge-start-x edge1)
+               (max (edge-start-x edge2) (edge-end-x edge2)))
+           (<= (min (edge-start-y edge1) (edge-end-y edge1))
+               (edge-start-y edge2)
+               (max (edge-start-y edge1) (edge-end-y edge1))))
+      (cons (edge-start-x edge1) (edge-start-y edge2))))
+
+;(edge-intersect (edge 0 0 5 0)
+;                (edge 1 2 1 -2))
+
+(defun intersects (puz)
+  (let* ((moves (puzzle-to-movements puz))
+         (line1 (first moves))
+         (line2 (second moves))
+         (edges1 (moves-to-segments line1))
+         (edges2 (moves-to-segments line2)))
+    (loop for edge1 in edges1 appending
+          (loop for edge2 in edges2
+                for intersect = (edge-intersect edge1 edge2)
+                if (and intersect (not (equal intersect '(0 . 0))))
+                collecting intersect))))
+
+(closest-distance (intersects (uiop:read-file-string #p"day3input")))
