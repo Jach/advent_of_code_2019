@@ -1,8 +1,9 @@
 ;;;; this file is in the public domain
 
-(ql:quickload :cmu-infix)
-(named-readtables:in-readtable cmu-infix:syntax)
-(ql:quickload :alexandria)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (ql:quickload :cmu-infix)
+  (named-readtables:in-readtable cmu-infix:syntax)
+  (ql:quickload :alexandria))
 
 ;; day 1
 
