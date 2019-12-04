@@ -226,3 +226,18 @@ U62,R66,U55,R34,D71,R55,D58,R83")
         (+ (steps-to-intersect (first movements) intersect)
            (steps-to-intersect (second movements) intersect))))
 
+;; day 4
+
+(defun meets-rules (num)
+  (let ((found-adjacent nil)
+        (never-decreases t)
+        (prev-char #\null))
+    (loop for char across (write-to-string num) do
+          (if (eql prev-char char)
+              (setf found-adjacent t))
+          (if (char> prev-char char)
+              (setf never-decreases nil))
+          (setf prev-char char))
+    (and found-adjacent never-decreases)))
+
+(loop for num from 138307 to 654504 counting (meets-rules num))
