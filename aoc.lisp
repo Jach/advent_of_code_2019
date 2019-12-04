@@ -241,3 +241,25 @@ U62,R66,U55,R34,D71,R55,D58,R83")
     (and found-adjacent never-decreases)))
 
 (loop for num from 138307 to 654504 counting (meets-rules num))
+
+
+(defun meets-rules2 (num)
+  (let ((found-adjacent-times 0)
+        (never-decreases t)
+        (prev-char #\null)
+        (count-cons-adjacent 0))
+    (loop for char across (write-to-string num) do
+          (if (eql prev-char char)
+              (progn
+                (incf count-cons-adjacent)
+                (if (= count-cons-adjacent 1) (incf found-adjacent-times)))
+              (progn
+                (if (> count-cons-adjacent 1) (decf found-adjacent-times))
+                (setf count-cons-adjacent 0)))
+          (if (char> prev-char char)
+              (setf never-decreases nil))
+          (setf prev-char char))
+    (if (> count-cons-adjacent 1) (decf found-adjacent-times))
+    (and (plusp found-adjacent-times) never-decreases)))
+
+(loop for num from 138307 to 654504 counting (meets-rules2 num))
