@@ -263,3 +263,93 @@ U62,R66,U55,R34,D71,R55,D58,R83")
     (and (plusp found-adjacent-times) never-decreases)))
 
 (loop for num from 138307 to 654504 counting (meets-rules2 num))
+
+;; day 5
+
+(defun opcode (instruction)
+  "Instruction is a number whose final two digits indicate an opcode."
+  (mod instruction 100))
+
+(defun get-operation (instruction)
+  "Returns a pair of (args-to-consume function-to-call).
+   That is, if the result is (3 lambda), consume the next
+   3 items (in whatever mode indicated) and call the lambda
+   with the program state followed by the 3 parameters that are aref/set-aref-able.
+   The instruction pointer then should advance 4.
+   If return is nil, program should halt."
+  (case (opcode instruction)
+    (1 (list 3 (lambda (p x y store@)
+                 (setf (aref p store@) (+ (aref p x)
+                                          (aref p y))))))
+    (2 (list 3 (lambda (p x y store@)
+                 (setf (aref p store@) (* (aref p x)
+                                          (aref p y))))))
+    (3 (list 1 (lambda (p store@)
+                 (setf (aref p store@) (read)))))
+    (4 (list 1 (lambda (p out)
+                 (print (aref p out)))))
+    (99 nil)))
+
+(defun instruction-to-fields (instruction)
+  "Returns instruction as a number string
+   of 5 digits. Final two digits correspond to the opcode,
+   digits above that correspond to parameter modes
+   for the params the opcode expects to consume."
+  (format nil "~5,'0d" instruction))
+
+(defun read-mode (fields param-num)
+  "Given fields (chiefly a string of 3+ chars 0 or 1) and a param-num,
+   returns whether the num mapped to a field should be read in
+   position or immediate mode.
+   i.e. if fields is 010, then (read-mode fields 1) is the right-most 0."
+  (if (char-equal (elt fields (- 2 (1- param-num)))
+                  #\0)
+      :position
+      :immediate))
+
+(defun consume-in-mode (p pc consume-count)
+  "Given a program, pc index, and consume-count,
+   returns a list of length consume-count containing
+   positions in p that are ready to aref by a consuming function."
+  (let ((fields (instruction-to-fields (aref p pc))))
+    (loop for arg-offset from 1 to consume-count collect
+          (let ((arg-pos (+ pc arg-offset)))
+            (if (eql :immediate (read-mode fields arg-offset))
+                arg-pos
+                (aref p arg-pos))))))
+
+#|
+(consume-in-mode #(1002 4 3 4 33)
+                 0
+                 3)
+(consume-in-mode #(1101 100 -1 4 0)
+                 0
+                 3)
+(consume-in-mode #(4 50) 0 1)
+|#
+
+
+(defun execute-program2 (p)
+  "Executes program p, which is an array
+   of instructions + memory."
+  (setf p (copy-seq p))
+  (loop for program-counter below (length p) do
+        (let* ((operation (get-operation (aref p program-counter)))
+               (consumed-args (first operation))
+               (op-func (second operation)))
+          ;(format t "PC=~d, instruction=~d, op=~a~%" program-counter (aref p program-counter) operation)
+          (if (null op-func) (return))
+          (let ((args (consume-in-mode p program-counter consumed-args)))
+            (apply op-func p args)
+            (incf program-counter (length args)))))
+  p)
+
+;(execute-program2 #(1 9 10 3 2 3 11 0 99 30 40 50))
+;(execute-program2 #(3 0 4 0 99))
+;(execute-program2 #(1002 4 3 4 33))
+(let ((p (coerce (mapcar #'parse-integer
+                         (uiop:split-string (uiop:read-file-string #p"day5input")
+                                            :separator ","))
+                 'vector)))
+  (execute-program2 p) ; give it value 1 as input for puz
+  nil)
