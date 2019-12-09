@@ -271,24 +271,47 @@ U62,R66,U55,R34,D71,R55,D58,R83")
   (mod instruction 100))
 
 (defun get-operation (instruction)
-  "Returns a pair of (args-to-consume function-to-call).
+  "Returns a triple of (args-to-consume function-to-call branches?).
    That is, if the result is (3 lambda), consume the next
    3 items (in whatever mode indicated) and call the lambda
    with the program state followed by the 3 parameters that are aref/set-aref-able.
-   The instruction pointer then should advance 4.
-   If return is nil, program should halt."
-  (case (opcode instruction)
-    (1 (list 3 (lambda (p x y store@)
-                 (setf (aref p store@) (+ (aref p x)
-                                          (aref p y))))))
-    (2 (list 3 (lambda (p x y store@)
-                 (setf (aref p store@) (* (aref p x)
-                                          (aref p y))))))
-    (3 (list 1 (lambda (p store@)
-                 (setf (aref p store@) (read)))))
-    (4 (list 1 (lambda (p out)
-                 (print (aref p out)))))
-    (99 nil)))
+   The instruction pointer then should advance to skip the next 3 params.
+   If return is nil, program should halt.
+   If branches? is present and true, then instead of advancing the program counter by
+   the number of parameters consumed, the executor should SET it to the lambda's return value,
+   if the return value is non-nil."
+  (macrolet ((@ (loc)
+               `(aref p ,loc)))
+    (case (opcode instruction)
+      (1 (list 3 (lambda (p x y store@) ; add
+                   (setf (@ store@) (+ (@ x)
+                                       (@ y))))))
+      (2 (list 3 (lambda (p x y store@) ; mult
+                   (setf (@ store@) (* (@ x)
+                                       (@ y))))))
+      (3 (list 1 (lambda (p store@) ; read
+                   (setf (@ store@) (read)))))
+      (4 (list 1 (lambda (p out) ; print
+                   (print (@ out)))))
+      (5 (list 2 (lambda (p test-param jump-to) ; jump-if-true
+                   (if (not (zerop (@ test-param)))
+                       (@ jump-to)
+                       nil))
+               t))
+      (6 (list 2 (lambda (p test-param jump-to) ; jump-if-false
+                   (if (zerop (@ test-param))
+                       (@ jump-to)
+                       nil))
+               t))
+      (7 (list 3 (lambda (p num1 num2 store@) ; num < num2
+                   (if (< (@ num1) (@ num2))
+                       (setf (@ store@) 1)
+                       (setf (@ store@) 0)))))
+      (8 (list 3 (lambda (p num1 num2 store@) ; num = num2
+                   (if (= (@ num1) (@ num2))
+                       (setf (@ store@) 1)
+                       (setf (@ store@) 0)))))
+      (99 nil))))
 
 (defun instruction-to-fields (instruction)
   "Returns instruction as a number string
@@ -333,15 +356,20 @@ U62,R66,U55,R34,D71,R55,D58,R83")
   "Executes program p, which is an array
    of instructions + memory."
   (setf p (copy-seq p))
-  (loop for program-counter below (length p) do
-        (let* ((operation (get-operation (aref p program-counter)))
-               (consumed-args (first operation))
-               (op-func (second operation)))
-          ;(format t "PC=~d, instruction=~d, op=~a~%" program-counter (aref p program-counter) operation)
-          (if (null op-func) (return))
-          (let ((args (consume-in-mode p program-counter consumed-args)))
-            (apply op-func p args)
-            (incf program-counter (length args)))))
+  (let ((program-counter 0)
+        (program-size (length p)))
+    (loop while (< program-counter program-size) do
+          (let* ((operation (get-operation (aref p program-counter)))
+                 (consumed-args (first operation))
+                 (op-func (second operation))
+                 (branches? (third operation)))
+            ;(format t "PC=~d, instruction=~d, op=~a~%" program-counter (aref p program-counter) operation)
+            (if (null op-func) (return))
+            (let* ((args (consume-in-mode p program-counter consumed-args))
+                   (op-result (apply op-func p args)))
+              (if (and branches? op-result)
+                  (setf program-counter op-result)
+                  (incf program-counter (1+ consumed-args)))))))
   p)
 
 ;(execute-program2 #(1 9 10 3 2 3 11 0 99 30 40 50))
@@ -351,5 +379,18 @@ U62,R66,U55,R34,D71,R55,D58,R83")
                          (uiop:split-string (uiop:read-file-string #p"day5input")
                                             :separator ","))
                  'vector)))
-  (execute-program2 p) ; give it value 1 as input for puz
+  (execute-program2 p) ; give it value 1 as input for puz part 1, give it value 5 for puz part 2
   nil)
+
+#|
+(execute-program2 #(1105 0 5
+                    104 4
+                    104 50))
+; 4, 50
+(execute-program2 #(1105 1 5
+                    104 4
+                    104 50))
+; just 50
+|#
+
+
