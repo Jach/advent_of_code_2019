@@ -159,7 +159,7 @@ U62,R66,U55,R34,D71,R55,D58,R83")
                   y new-y)))
     segments))
 
-(moves-to-segments (first (puzzle-to-movements *ex1*)))
+(defun sol () (moves-to-segments (first (puzzle-to-movements *ex1*))))
 
 (defun edge-intersect (edge1 edge2)
   ; make it so we can assume edge1 has same x for start/end, edge2 has same-y for start/end.
@@ -191,7 +191,7 @@ U62,R66,U55,R34,D71,R55,D58,R83")
                 if (and intersect (not (equal intersect '(0 . 0))))
                 collecting intersect))))
 
-(closest-distance (intersects (uiop:read-file-string #p"day3input")))
+(defun sol3-part1 () (closest-distance (intersects (uiop:read-file-string #p"day3input"))))
 
 ; part 2
 
@@ -220,12 +220,14 @@ U62,R66,U55,R34,D71,R55,D58,R83")
         (incf steps (edge-dist edge))))
     steps))
 
+(defun sol3-part2 ()
 (let* ((puz (uiop:read-file-string #p"day3input"))
        (movements (puzzle-to-movements puz))
        (intersects (intersects puz)))
   (loop for intersect in intersects minimizing
         (+ (steps-to-intersect (first movements) intersect)
            (steps-to-intersect (second movements) intersect))))
+)
 
 ;; day 4
 
@@ -241,7 +243,9 @@ U62,R66,U55,R34,D71,R55,D58,R83")
           (setf prev-char char))
     (and found-adjacent never-decreases)))
 
+(defun sol4-part1 ()
 (loop for num from 138307 to 654504 counting (meets-rules num))
+)
 
 
 (defun meets-rules2 (num)
@@ -263,7 +267,9 @@ U62,R66,U55,R34,D71,R55,D58,R83")
     (if (> count-cons-adjacent 1) (decf found-adjacent-times))
     (and (plusp found-adjacent-times) never-decreases)))
 
+(defun sol4-part2 ()
 (loop for num from 138307 to 654504 counting (meets-rules2 num))
+)
 
 ;; day 5
 
@@ -376,12 +382,14 @@ U62,R66,U55,R34,D71,R55,D58,R83")
 ;(execute-program2 #(1 9 10 3 2 3 11 0 99 30 40 50))
 ;(execute-program2 #(3 0 4 0 99))
 ;(execute-program2 #(1002 4 3 4 33))
+(defun sol5 ()
 (let ((p (coerce (mapcar #'parse-integer
                          (uiop:split-string (uiop:read-file-string #p"day5input")
                                             :separator ","))
                  'vector)))
   (execute-program2 p) ; give it value 1 as input for puz part 1, give it value 5 for puz part 2
   nil)
+)
 
 #|
 (execute-program2 #(1105 0 5
@@ -429,14 +437,17 @@ U62,R66,U55,R34,D71,R55,D58,R83")
 )
 ;(test-orb)
 
+(defun sol6-part1 ()
 (let ((orbits (make-instance 'orbits))
       (count-all 0))
   (dolist (edge (input-to-edges))
     (add-orbit orbits (first edge) (second edge)))
   (maphash (lambda (k v)
+             (declare (ignorable v))
              (incf count-all (length (all-orbits orbits k))))
            (orbits-map orbits))
   count-all)
+)
 
 ; part 2
 
@@ -454,9 +465,10 @@ U62,R66,U55,R34,D71,R55,D58,R83")
               (unless (find orb visited)
                 (serapeum:enq (list orb (1+ cur-steps)) frontier)))))))
 
+(defun sol6-part2 ()
 (let ((orbits (make-instance 'orbits)))
   (dolist (edge (input-to-edges))
     (add-orbit orbits (first edge) (second edge))
     (add-orbit orbits (second edge) (first edge))) ; not really 'orbits' anymore, just double-connected graph edges so we can find everything
   (- (steps-to-reach orbits "YOU" "SAN") 2))
-
+)
