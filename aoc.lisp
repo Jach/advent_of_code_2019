@@ -393,4 +393,46 @@ U62,R66,U55,R34,D71,R55,D58,R83")
 ; just 50
 |#
 
+;; day 6
 
+(defun input-to-edges ()
+  (mapcar (lambda (line) (uiop:split-string line :separator ")")) (uiop:read-file-lines #p"day6input")))
+
+(defclass orbits ()
+  ((graph :accessor orbits-map :initform (make-hash-table :test #'equal))))
+
+(defmethod add-orbit ((this orbits) orbitee orbiter)
+  (push orbitee (gethash orbiter (orbits-map this))))
+
+(defmethod direct-orbits ((this orbits) orbitee)
+  (gethash orbitee (orbits-map this)))
+
+(defmethod all-orbits ((this orbits) orbitee)
+  (alexandria:if-let ((directs (direct-orbits this orbitee)))
+    (append directs (mapcan (lambda (orbitee) (all-orbits this orbitee))
+                            directs))
+    '()))
+
+(defmethod indirect-orbits ((this orbits) orbitee)
+  (subseq (all-orbits this orbitee) 1))
+
+(defun test-orb ()
+  (let ((orbits (make-instance 'orbits)))
+    (add-orbit orbits "COM" "B")
+    (add-orbit orbits "B" "G")
+    (add-orbit orbits "G" "H")
+    (add-orbit orbits "H" "J")
+    (print (direct-orbits orbits "J"))
+    (print (indirect-orbits orbits "J"))
+    (orbits-map orbits))
+)
+;(test-orb)
+
+(let ((orbits (make-instance 'orbits))
+      (count-all 0))
+  (dolist (edge (input-to-edges))
+    (add-orbit orbits (first edge) (second edge)))
+  (maphash (lambda (k v)
+             (incf count-all (length (all-orbits orbits k))))
+           (orbits-map orbits))
+  count-all)
