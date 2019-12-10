@@ -4,6 +4,8 @@
   (ql:quickload :cmu-infix)
   (named-readtables:in-readtable cmu-infix:syntax)
   (ql:quickload :alexandria)
+  (ql:quickload :bordeaux-threads)
+  (ql:quickload :cl-plumbing)
   (ql:quickload :serapeum))
 
 ;; day 1
@@ -520,5 +522,87 @@ U62,R66,U55,R34,D71,R55,D58,R83")
       (list 0 1 2 3 4))
     max-signal))
 
-(sol7-part1)
+
+#| testing
+(bt:all-threads)
+(let* ((intercepted-in-pipe (cl-plumbing:make-pipe)))
+  (bt:make-thread
+    (lambda ()
+      (format t "thread start~%")
+      (let ((*standard-input* intercepted-in-pipe))
+        (format t "read ~a~%" (read))
+        (format t "read ~a~%" (read)))
+      (format t "thread end~%")))
+  (sleep 2)
+  (print "blah" intercepted-in-pipe)
+  (sleep 2)
+  (print "blah2" intercepted-in-pipe)
+  )
+|#
+
+(defun execute-phase-setting-sequence-feedback (setting &optional (p *d7-p*))
+  ; similar to previous version, but each execute
+  ; is now in its own thread, and the input/output streams
+  ; are wired to be shared pipes so that threads can wait
+  ; for one pipe to write so it can read
+  (destructuring-bind (phase1 phase2 phase3 phase4 phase5) setting
+    (let ((a->b (cl-plumbing:make-pipe))
+          (b->c (cl-plumbing:make-pipe))
+          (c->d (cl-plumbing:make-pipe))
+          (d->e (cl-plumbing:make-pipe))
+          (e->a (cl-plumbing:make-pipe)))
+      ; init e->a
+      (print phase1 e->a)
+      (print 0 e->a)
+      ; init initial phase settings for others
+      (print phase2 a->b)
+      (print phase3 b->c)
+      (print phase4 c->d)
+      (print phase5 d->e)
+
+      (bt:make-thread
+        (lambda ()
+          (let ((*standard-input* e->a)
+                (*standard-output* a->b))
+            (execute p)))
+        :name "a")
+      (bt:make-thread
+        (lambda ()
+          (let ((*standard-input* a->b)
+                (*standard-output* b->c))
+            (execute p)))
+        :name "b")
+      (bt:make-thread
+        (lambda ()
+          (let ((*standard-input* b->c)
+                (*standard-output* c->d))
+            (execute p)))
+        :name "c")
+      (bt:make-thread
+        (lambda ()
+          (let ((*standard-input* c->d)
+                (*standard-output* d->e))
+            (execute p)))
+        :name "d")
+      (bt:join-thread
+        (bt:make-thread
+          (lambda ()
+            (let ((*standard-input* d->e)
+                  (*standard-output* e->a))
+              (execute p)))
+          :name "e"))
+      (read e->a)
+      )))
+
+(defun test-exe-ph2 ()
+  (let ((*d7-p* #(3 26 1001 26 -4 26 3 27 1002 27 2 27 1 27 26 27 4 27 1001 28 -1 28 1005 28 6 99 0 0 5)))
+    (execute-phase-setting-sequence-feedback (list 9 8 7 6 5) *d7-p*)))
+
+(defun sol7-part2 ()
+  (let ((max-signal most-negative-fixnum))
+    (alexandria:map-permutations
+      (lambda (perm)
+        (setf max-signal (max max-signal (execute-phase-setting-sequence-feedback perm))))
+      (list 5 6 7 8 9))
+    max-signal))
 
