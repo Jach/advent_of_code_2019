@@ -472,3 +472,53 @@ U62,R66,U55,R34,D71,R55,D58,R83")
     (add-orbit orbits (second edge) (first edge))) ; not really 'orbits' anymore, just double-connected graph edges so we can find everything
   (- (steps-to-reach orbits "YOU" "SAN") 2))
 )
+
+;; day 7
+
+(defun execute (program)
+  (execute-program2 program))
+
+(defun input-to-program (input-path)
+  (coerce (mapcar #'parse-integer
+                  (uiop:split-string (uiop:read-file-string input-path)
+                                     :separator ","))
+          'vector))
+
+(defparameter *d7-p* (input-to-program #p"day7input"))
+
+(defun phase-signal-stream (phase signal)
+  (make-string-input-stream (format nil "~d ~d" phase signal)))
+
+(defun execute-phase-setting-sequence (setting)
+  ; for each phase, wire it up so that first read -> first phase, second read -> 0, first print goes to new stream set up so that third read -> second phase, fourth read -> first from output, etc
+  (destructuring-bind (phase1 phase2 phase3 phase4 phase5) setting
+    (let ((*standard-input* (phase-signal-stream phase1 0))
+          (*standard-output* (make-string-output-stream)))
+      (execute *d7-p*)
+      (setf *standard-input* (phase-signal-stream phase2 (read-from-string (get-output-stream-string *standard-output*))))
+      (execute *d7-p*)
+      (setf *standard-input* (phase-signal-stream phase3 (read-from-string (get-output-stream-string *standard-output*))))
+      (execute *d7-p*)
+      (setf *standard-input* (phase-signal-stream phase4 (read-from-string (get-output-stream-string *standard-output*))))
+      (execute *d7-p*)
+      (setf *standard-input* (phase-signal-stream phase5 (read-from-string (get-output-stream-string *standard-output*))))
+      (execute *d7-p*)
+      (read-from-string (get-output-stream-string *standard-output*))
+      )))
+
+(defun test-exe-ph ()
+  (let ((*d7-p* #(3 15 3 16 1002 16 10 16 1 16 15 15 4 15 99 0 0)))
+    (execute-phase-setting-sequence (list 4 3 2 1 0)))
+  (let ((*d7-p* #(3 23 3 24 1002 24 10 24 1002 23 -1 23 101 5 23 23 1 24 23 23 4 23 99 0 0)))
+    (execute-phase-setting-sequence (list 0 1 2 3 4))))
+
+(defun sol7-part1 ()
+  (let ((max-signal most-negative-fixnum))
+    (alexandria:map-permutations
+      (lambda (perm)
+        (setf max-signal (max max-signal (execute-phase-setting-sequence perm))))
+      (list 0 1 2 3 4))
+    max-signal))
+
+(sol7-part1)
+
