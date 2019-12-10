@@ -3,7 +3,8 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (ql:quickload :cmu-infix)
   (named-readtables:in-readtable cmu-infix:syntax)
-  (ql:quickload :alexandria))
+  (ql:quickload :alexandria)
+  (ql:quickload :serapeum))
 
 ;; day 1
 
@@ -436,3 +437,26 @@ U62,R66,U55,R34,D71,R55,D58,R83")
              (incf count-all (length (all-orbits orbits k))))
            (orbits-map orbits))
   count-all)
+
+; part 2
+
+(defmethod steps-to-reach ((this orbits) start-node end-node)
+  ; BFS will find the shortest path
+  (let ((frontier (serapeum:queue (mapcan (lambda (orb) (list orb 1)) ; each pair is node, then accumulated path-length from first parent
+                                          (direct-orbits this start-node))))
+        (visited '()))
+    (loop until (zerop (serapeum:qlen frontier)) do
+          (destructuring-bind (cur-node cur-steps) (serapeum:deq frontier)
+            (when (equal cur-node end-node)
+              (return-from steps-to-reach cur-steps))
+            (push cur-node visited)
+            (dolist (orb (direct-orbits this cur-node))
+              (unless (find orb visited)
+                (serapeum:enq (list orb (1+ cur-steps)) frontier)))))))
+
+(let ((orbits (make-instance 'orbits)))
+  (dolist (edge (input-to-edges))
+    (add-orbit orbits (first edge) (second edge))
+    (add-orbit orbits (second edge) (first edge))) ; not really 'orbits' anymore, just double-connected graph edges so we can find everything
+  (- (steps-to-reach orbits "YOU" "SAN") 2))
+
