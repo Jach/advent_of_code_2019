@@ -6,6 +6,7 @@
   (ql:quickload :alexandria)
   (ql:quickload :bordeaux-threads)
   (ql:quickload :cl-plumbing)
+  (ql:quickload :array-operations)
   (ql:quickload :serapeum))
 
 ;; day 1
@@ -606,3 +607,37 @@ U62,R66,U55,R34,D71,R55,D58,R83")
       (list 5 6 7 8 9))
     max-signal))
 
+;; day 8
+
+(defparameter *img-raw* (string-trim '(#\Newline) (uiop:read-file-string #p"day8input")))
+(defparameter *img-width* 25)
+(defparameter *img-height* 6)
+
+(defun extract-layers (img w h)
+  "Given img str, w, h, returns list of img str broken into layers."
+  (aops:reshape img (list (/ (length img) (* w h))
+                          (* w h))))
+
+(defun fewest-zeros-layer (img w h)
+  (let ((layered (extract-layers img w h))
+        (least-zero-count most-positive-fixnum)
+        (layer-with-fewest-0s nil))
+    (dotimes (layer-id (array-dimension layered 0))
+      (let* ((layer (aops:displace layered (* w h) (* layer-id (* w h))))
+             (zero-count (count #\0 layer)))
+        (when (< zero-count least-zero-count)
+          (setf least-zero-count zero-count
+                layer-with-fewest-0s layer-id))))
+    layer-with-fewest-0s))
+
+(defun count-in-layer (item img w h layer-id)
+  (count item (aops:displace (extract-layers img w h)
+                             (* w h)
+                             (* layer-id (* w h)))))
+
+
+(defun sol8-part1 ()
+(fewest-zeros-layer *img-raw* *img-width* *img-height*)
+(* (count-in-layer #\1 *img-raw* *img-width* *img-height* 5)
+   (count-in-layer #\2 *img-raw* *img-width* *img-height* 5))
+)
