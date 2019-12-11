@@ -609,7 +609,9 @@ U62,R66,U55,R34,D71,R55,D58,R83")
 
 ;; day 8
 
-(defparameter *img-raw* (string-trim '(#\Newline) (uiop:read-file-string #p"day8input")))
+(defparameter *img-raw* (map 'vector
+                             (lambda (c) (parse-integer (string c)))
+                             (string-trim '(#\Newline) (uiop:read-file-string #p"day8input"))))
 (defparameter *img-width* 25)
 (defparameter *img-height* 6)
 
@@ -622,22 +624,65 @@ U62,R66,U55,R34,D71,R55,D58,R83")
   (let ((layered (extract-layers img w h))
         (least-zero-count most-positive-fixnum)
         (layer-with-fewest-0s nil))
-    (dotimes (layer-id (array-dimension layered 0))
-      (let* ((layer (aops:displace layered (* w h) (* layer-id (* w h))))
-             (zero-count (count #\0 layer)))
+    (dotimes (layer-id (layer-count layered))
+      (let* ((layer (layer layered w h layer-id))
+             (zero-count (count 0 layer)))
         (when (< zero-count least-zero-count)
           (setf least-zero-count zero-count
                 layer-with-fewest-0s layer-id))))
     layer-with-fewest-0s))
 
 (defun count-in-layer (item img w h layer-id)
-  (count item (aops:displace (extract-layers img w h)
-                             (* w h)
-                             (* layer-id (* w h)))))
+  (count item (layer (extract-layers img w h) w h layer-id)))
 
 
 (defun sol8-part1 ()
 (fewest-zeros-layer *img-raw* *img-width* *img-height*)
-(* (count-in-layer #\1 *img-raw* *img-width* *img-height* 5)
-   (count-in-layer #\2 *img-raw* *img-width* *img-height* 5))
+(* (count-in-layer 1 *img-raw* *img-width* *img-height* 5)
+   (count-in-layer 2 *img-raw* *img-width* *img-height* 5))
 )
+
+; part 2
+
+(defun layer-count (img &optional w h)
+  (array-dimension (if (null w) img (extract-layers img w h)) 0))
+
+(defun layer (layered-img w h id)
+  (aops:displace layered-img (* w h) (* id (* w h))))
+
+(defun layer-to-2d (layer w h)
+  (aops:reshape layer (list h w)))
+
+(defun first-non-transparent-pixel (layered-img w h row col)
+  "0 = black, 1 = white, 2 = transparent. Goes through each layer of layered-img until
+   finds a 0/1 or the end at the row/col slot."
+  (let ((pixel nil))
+    (dotimes (layer-id (layer-count layered-img))
+      (let* ((layer (layer layered-img w h layer-id))
+             (layer2d (layer-to-2d layer w h)))
+        (setf pixel (aref layer2d row col))
+        (when (not (= pixel 2))
+          (return))))
+    pixel))
+
+(load #p"ppmimage.lisp")
+(defun merge-layered-img (img w h)
+  (let ((final-img (make-array (list h w)))
+        (layered-img (extract-layers img w h))
+        (ppm-img (ppmimage:make-ppm-image w h :RGB))
+        (white (ppmimage:make-color 255 255 255 255))
+        (black (ppmimage:make-color 0 0 0 0)))
+    (loop for row below h do
+          (loop for col below w do
+                (let ((pixel (first-non-transparent-pixel layered-img w h row col)))
+                  (setf (aref final-img row col) pixel)
+                  (setf (ppmimage:ppm-image-get ppm-img col row) (if (zerop pixel) black white)))))
+    (ppmimage:write-ppm-image ppm-img "./" "day8sol.ppm")
+    (format t "Wrote image to day8sol.ppm~%")
+    final-img))
+
+(defun sol8-part2 ()
+(merge-layered-img *img-raw* *img-width* *img-height*)
+)
+; still can't make it out even after changing to ints instead of #\chars... :( guess I just need to plot it.
+; fortunately I have a partial ppm image maker from another project.
